@@ -112,6 +112,20 @@ function PlayPageClient() {
     blockAdEnabledRef.current = blockAdEnabled;
   }, [blockAdEnabled]);
 
+  // 外部播放器去广告开关（独立状态，默认 false）
+  const [externalPlayerAdBlock, setExternalPlayerAdBlock] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const v = localStorage.getItem('external_player_adblock');
+      if (v !== null) return v === 'true';
+    }
+    return false;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('external_player_adblock', String(externalPlayerAdBlock));
+    }
+  }, [externalPlayerAdBlock]);
+
   // 自定义去广告代码（从服务器获取并缓存）
   const customAdFilterCodeRef = useRef<string>('');
 
@@ -3399,84 +3413,101 @@ function PlayPageClient() {
               {videoUrl && (
                 <div className='mt-3 px-2 lg:flex-shrink-0 flex justify-end'>
                   <div className='bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg p-2 border border-gray-200/50 dark:border-gray-700/50 w-full lg:w-auto overflow-x-auto'>
-                    <div className='flex gap-1.5 justify-end lg:flex-wrap'>
-                      {/* 下载按钮 */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const isM3u8 = videoUrl.toLowerCase().includes('.m3u8') || videoUrl.toLowerCase().includes('/m3u8/');
+                    <div className='flex gap-1.5 justify-between lg:flex-wrap items-center'>
+                      <div className='flex gap-1.5 lg:flex-wrap'>
+                        {/* 下载按钮 */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            // 使用代理 URL
+                            const proxyUrl = externalPlayerAdBlock
+                              ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                              : videoUrl;
+                            const isM3u8 = videoUrl.toLowerCase().includes('.m3u8') || videoUrl.toLowerCase().includes('/m3u8/');
 
-                          if (isM3u8) {
-                            // M3U8格式 - 复制链接并提示
-                            navigator.clipboard.writeText(videoUrl).then(() => {
-                              if (artPlayerRef.current) {
-                                artPlayerRef.current.notice.show = '链接已复制！请使用 FFmpeg、N_m3u8DL-CLI 或 Downie 等工具下载';
-                              }
-                            }).catch(() => {
-                              if (artPlayerRef.current) {
-                                artPlayerRef.current.notice.show = '复制失败，请手动复制链接';
-                              }
-                            });
-                          } else {
-                            // 普通视频格式 - 直接下载
-                            const a = document.createElement('a');
-                            a.href = videoUrl;
-                            a.download = `${videoTitle}_第${currentEpisodeIndex + 1}集.mp4`;
-                            a.target = '_blank';
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
+                            if (isM3u8) {
+                              // M3U8格式 - 复制链接并提示
+                              navigator.clipboard.writeText(proxyUrl).then(() => {
+                                if (artPlayerRef.current) {
+                                  artPlayerRef.current.notice.show = externalPlayerAdBlock
+                                    ? '代理链接已复制(含去广告)！请使用 FFmpeg、N_m3u8DL-CLI 或 Downie 等工具下载'
+                                    : '链接已复制！请使用 FFmpeg、N_m3u8DL-CLI 或 Downie 等工具下载';
+                                }
+                              }).catch(() => {
+                                if (artPlayerRef.current) {
+                                  artPlayerRef.current.notice.show = '复制失败，请手动复制链接';
+                                }
+                              });
+                            } else {
+                              // 普通视频格式 - 直接下载
+                              const a = document.createElement('a');
+                              a.href = proxyUrl;
+                              a.download = `${videoTitle}_第${currentEpisodeIndex + 1}集.mp4`;
+                              a.target = '_blank';
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
 
-                            if (artPlayerRef.current) {
-                              artPlayerRef.current.notice.show = '开始下载...';
+                              if (artPlayerRef.current) {
+                                artPlayerRef.current.notice.show = '开始下载...';
+                              }
                             }
-                          }
-                        }}
-                        className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-green-400 flex-shrink-0'
-                        title='下载视频'
-                      >
-                        <svg
-                          className='w-4 h-4 flex-shrink-0 text-white'
-                          fill='none'
-                          stroke='currentColor'
-                          viewBox='0 0 24 24'
+                          }}
+                          className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-green-400 flex-shrink-0'
+                          title='下载视频'
                         >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth='2'
-                            d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
-                          />
-                        </svg>
-                        <span className='hidden lg:inline max-w-0 group-hover:max-w-[100px] overflow-hidden whitespace-nowrap transition-all duration-200 ease-in-out text-white'>
-                          下载
-                        </span>
-                      </button>
+                          <svg
+                            className='w-4 h-4 flex-shrink-0 text-white'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth='2'
+                              d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'
+                            />
+                          </svg>
+                          <span className='hidden lg:inline max-w-0 group-hover:max-w-[100px] overflow-hidden whitespace-nowrap transition-all duration-200 ease-in-out text-white'>
+                            下载
+                          </span>
+                        </button>
 
-                      {/* PotPlayer */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.open(`potplayer://${videoUrl}`, '_blank');
-                        }}
-                        className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0'
-                        title='PotPlayer'
-                      >
-                        <img
-                          src='/players/potplayer.png'
-                          alt='PotPlayer'
-                          className='w-4 h-4 flex-shrink-0'
-                        />
-                        <span className='hidden lg:inline max-w-0 group-hover:max-w-[100px] overflow-hidden whitespace-nowrap transition-all duration-200 ease-in-out text-gray-700 dark:text-gray-200'>
-                          PotPlayer
-                        </span>
-                      </button>
+                        {/* PotPlayer */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            // 使用代理 URL
+                            const proxyUrl = externalPlayerAdBlock
+                              ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                              : videoUrl;
+                            // URL encode 避免冒号被吃掉
+                            window.open(`potplayer://${proxyUrl}`, '_blank');
+                          }}
+                          className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0'
+                          title='PotPlayer'
+                        >
+                          <img
+                            src='/players/potplayer.png'
+                            alt='PotPlayer'
+                            className='w-4 h-4 flex-shrink-0'
+                          />
+                          <span className='hidden lg:inline max-w-0 group-hover:max-w-[100px] overflow-hidden whitespace-nowrap transition-all duration-200 ease-in-out text-gray-700 dark:text-gray-200'>
+                            PotPlayer
+                          </span>
+                        </button>
 
                       {/* VLC */}
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          window.open(`vlc://${videoUrl}`, '_blank');
+                          // 使用代理 URL
+                          const proxyUrl = externalPlayerAdBlock
+                            ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                            : videoUrl;
+                          // URL encode 避免冒号被吃掉
+                          window.open(`vlc://${proxyUrl}`, '_blank');
                         }}
                         className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0'
                         title='VLC'
@@ -3495,7 +3526,12 @@ function PlayPageClient() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          window.open(`mpv://${videoUrl}`, '_blank');
+                          // 使用代理 URL
+                          const proxyUrl = externalPlayerAdBlock
+                            ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                            : videoUrl;
+                          // URL encode 避免冒号被吃掉
+                          window.open(`mpv://${proxyUrl}`, '_blank');
                         }}
                         className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0'
                         title='MPV'
@@ -3514,11 +3550,12 @@ function PlayPageClient() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
+                          // 使用代理 URL
+                          const proxyUrl = externalPlayerAdBlock
+                            ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                            : videoUrl;
                           window.open(
-                            `intent://${videoUrl.replace(
-                              /^https?:\/\//,
-                              ''
-                            )}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(
+                            `intent://${proxyUrl}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(
                               videoTitle
                             )};end`,
                             '_blank'
@@ -3541,7 +3578,11 @@ function PlayPageClient() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
-                          window.open(`nplayer-${videoUrl}`, '_blank');
+                          // 使用代理 URL
+                          const proxyUrl = externalPlayerAdBlock
+                            ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                            : videoUrl;
+                          window.open(`nplayer-${proxyUrl}`, '_blank');
                         }}
                         className='group relative flex items-center justify-center gap-1 w-8 h-8 lg:w-auto lg:h-auto lg:px-2 lg:py-1.5 bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs font-medium rounded-md transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0'
                         title='nPlayer'
@@ -3560,9 +3601,13 @@ function PlayPageClient() {
                       <button
                         onClick={(e) => {
                           e.preventDefault();
+                          // 使用代理 URL
+                          const proxyUrl = externalPlayerAdBlock
+                            ? `${window.location.origin}/api/proxy-m3u8?url=${encodeURIComponent(videoUrl)}&source=${encodeURIComponent(currentSource)}`
+                            : videoUrl;
                           window.open(
                             `iina://weblink?url=${encodeURIComponent(
-                              videoUrl
+                              proxyUrl
                             )}`,
                             '_blank'
                           );
@@ -3577,6 +3622,44 @@ function PlayPageClient() {
                         />
                         <span className='hidden lg:inline max-w-0 group-hover:max-w-[100px] overflow-hidden whitespace-nowrap transition-all duration-200 ease-in-out text-gray-700 dark:text-gray-200'>
                           IINA
+                        </span>
+                      </button>
+                      </div>
+
+                      {/* 去广告开关 */}
+                      <button
+                        onClick={() => setExternalPlayerAdBlock(!externalPlayerAdBlock)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer border flex-shrink-0 ${
+                          externalPlayerAdBlock
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-blue-400'
+                            : 'bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600'
+                        }`}
+                        title={externalPlayerAdBlock ? '去广告已开启' : '去广告已关闭'}
+                      >
+                        <svg
+                          className='w-4 h-4 flex-shrink-0'
+                          fill='none'
+                          stroke='currentColor'
+                          viewBox='0 0 24 24'
+                        >
+                          {externalPlayerAdBlock ? (
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth='2'
+                              d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                            />
+                          ) : (
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth='2'
+                              d='M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636'
+                            />
+                          )}
+                        </svg>
+                        <span className='whitespace-nowrap'>
+                          {externalPlayerAdBlock ? '去广告' : '去广告'}
                         </span>
                       </button>
                     </div>
