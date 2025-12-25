@@ -27,7 +27,8 @@ export interface SeasonInfo {
  */
 export function parseSeasonFromTitle(title: string): SeasonInfo {
   const originalTitle = title;
-  let cleanTitle = title;
+  // 先将下划线替换成空格，方便后续解析和搜索
+  let cleanTitle = title.replace(/_/g, ' ');
   let seasonNumber: number | null = null;
   let year: number | null = null;
 
@@ -80,13 +81,13 @@ export function parseSeasonFromTitle(title: string): SeasonInfo {
 
   // 尝试匹配每个模式
   for (const pattern of patterns) {
-    const match = title.match(pattern.regex);
+    const match = cleanTitle.match(pattern.regex);
     if (match) {
       const extracted = pattern.extract(match);
       if (extracted !== null) {
         seasonNumber = extracted;
         // 移除匹配到的季度标识
-        cleanTitle = title.replace(pattern.regex, '').trim();
+        cleanTitle = cleanTitle.replace(pattern.regex, '').trim();
         break;
       }
     }

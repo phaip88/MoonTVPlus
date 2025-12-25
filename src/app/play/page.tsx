@@ -2077,7 +2077,7 @@ function PlayPageClient() {
         }
       }
 
-      let newDetail = availableSources.find(
+      let newDetail: SearchResult | undefined = availableSources.find(
         (source) => source.source === newSource && source.id === newId
       );
       if (!newDetail) {
@@ -2090,7 +2090,11 @@ function PlayPageClient() {
         try {
           const detailResponse = await fetch(`/api/detail?source=${newSource}&id=${newId}`);
           if (detailResponse.ok) {
-            newDetail = await detailResponse.json();
+            const detailData = await detailResponse.json();
+            if (!detailData) {
+              throw new Error('获取的详情数据为空');
+            }
+            newDetail = detailData;
           } else {
             throw new Error('获取 openlist 详情失败');
           }
@@ -2100,6 +2104,12 @@ function PlayPageClient() {
           setError('获取视频详情失败，请重试');
           return;
         }
+      }
+
+      // 再次确认 newDetail 不为空（类型守卫）
+      if (!newDetail) {
+        setError('视频详情数据无效');
+        return;
       }
 
       // 尝试跳转到当前正在播放的集数

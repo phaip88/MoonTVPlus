@@ -178,7 +178,6 @@ export default function CorrectDialog({
 
       if (season && season.season_number > 1) {
         finalTitle = `${finalTitle} ${season.name}`;
-        finalTmdbId = season.id; // 使用季度的ID
       }
 
       const body: any = {

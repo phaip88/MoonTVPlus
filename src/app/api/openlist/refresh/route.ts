@@ -249,7 +249,6 @@ async function performScan(
                 // 如果是第二季及以后，替换标题和ID
                 if (seasonDetails.season.season_number > 1) {
                   folderInfo.title = `${folderInfo.title} ${seasonDetails.season.name}`;
-                  folderInfo.tmdb_id = seasonDetails.season.id; // 使用季度的ID
                 }
 
                 // 使用季度的海报（如果有）
